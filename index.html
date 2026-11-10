@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semáforo</title>
+<style>
+  body { margin:0; padding:16px; background:#16252a; color:#f2f2f2; font-family:system-ui,sans-serif; text-align:center; }
+  h1 { margin:6px 0 10px; }
+  .hud { display:flex; justify-content:center; gap:24px; font-size:18px; flex-wrap:wrap; margin-bottom:12px; }
+  .escena { max-width:640px; margin:0 auto; background:#2b3b40; border-radius:10px; padding:14px; }
+  .luces { display:flex; justify-content:center; gap:40px; margin-bottom:12px; }
+  .semaforo { background:#0d1416; border-radius:10px; padding:8px 10px; display:flex; flex-direction:column; gap:6px; align-items:center; }
+  .semaforo small { font-size:12px; opacity:.8; }
+  .luz { width:22px; height:22px; border-radius:50%; background:#333; }
+  .luz.rojo.on { background:#ff3b30; }
+  .luz.amarillo.on { background:#ffcc00; }
+  .luz.verde.on { background:#34c759; }
+  .fila { display:flex; justify-content:space-between; align-items:center; background:#3a3a40; border-radius:6px; padding:8px 12px; margin:6px 0; min-height:30px; font-size:22px; }
+  .fila span.t { font-size:14px; opacity:.85; min-width:130px; text-align:left; }
+  .fila span.ic { flex:1; text-align:left; letter-spacing:2px; overflow:hidden; }
+  button { font-size:18px; padding:10px 22px; margin:10px 4px 0; border:0; border-radius:6px; background:#f2b632; color:#222; cursor:pointer; font-weight:600; }
+  button:hover { background:#ffd25e; }
+  #log { min-height:44px; margin-top:10px; color:#ff8a7a; font-weight:600; }
+</style>
+</head>
+<body>
+<h1>El Semáforo Inteligente</h1>
+<div class="hud">
+  <span>Turno: <b id="turno">0</b></span>
+  <span>Vidas: <b id="vidas">3</b></span>
+  <span>Puntos: <b id="puntos">0</b></span>
+  <span>Semáforo: <b id="estado">autos</b></span>
+</div>
+<div class="escena">
+  <div class="luces">
+    <div class="semaforo"><small>Autos</small>
+      <div class="luz rojo" id="a-rojo"></div><div class="luz amarillo" id="a-amarillo"></div><div class="luz verde" id="a-verde"></div>
+    </div>
+    <div class="semaforo"><small>Peatones</small>
+      <div class="luz rojo" id="p-rojo"></div><div class="luz verde" id="p-verde"></div>
+    </div>
+  </div>
+  <div class="fila"><span class="t">Autos esperando</span><span class="ic" id="cola"></span></div>
+  <div class="fila"><span class="t">Autos en el cruce</span><span class="ic" id="cruceAutos"></span></div>
+  <div class="fila"><span class="t">Peatones cruzando</span><span class="ic" id="cruzando"></span></div>
+  <div class="fila"><span class="t">Peatones esperando</span><span class="ic" id="esperando"></span></div>
+</div>
+<button id="btnCambiar">Cambiar semáforo (Espacio)</button>
+<button id="btnReiniciar">Reiniciar</button>
+<div id="log"></div>
+
+<script>
+let juego;
+let intervalo;
+
+function nuevoJuego() {
+  return {
+    estado: "autos",
+    temporizador: 0,
+    colaAutos: 0,
+    autosEnCruce: [],
+    peatonesEsperando: 0,
+    peatonesCruzando: [],
+    esperaPeatones: 0,
+    esperaAutos: 0,
+    vidas: 3,
+    puntos: 0,
+    turno: 0,
+    mensajes: []
+  };
+}
+
+function cambiarSemaforo(j) {
+  if (j.estado === "autos") {
+    j.estado = "amarillo";
+    j.temporizador = 2;
+  } else if (j.estado === "peatones") {
+    j.estado = "parpadeo";
+    j.temporizador = 2;
+  } else {
+    j.mensajes.push("El semáforo ya está cambiando.");
+  }
+}
+
+function actualizarSemaforo(j) {
+  if (j.estado === "amarillo" || j.estado === "parpadeo") {
+    j.temporizador -= 1;
+    if (j.temporizador <= 0) {
+      j.estado = j.estado === "amarillo" ? "peatones" : "autos";
+    }
+  }
+}
+
+function aparecenNuevos(j) {
+  if (Math.random() < 0.4) j.colaAutos += 1;
+  if (Math.random() < 0.2) j.peatonesEsperando += 1;
+}
+
+function moverAutos(j) {
+  j.autosEnCruce = j.autosEnCruce.map(t => t - 1);
+  const salieron = j.autosEnCruce.filter(t => t <= 0).length;
+  j.autosEnCruce = j.autosEnCruce.filter(t => t > 0);
+  j.puntos += 10 * salieron;
+  if (j.estado === "autos" && j.colaAutos > 0) {
+    j.colaAutos -= 1;
+    j.autosEnCruce.push(3);
+  }
+}
+
+function moverPeatones(j) {
+  j.peatonesCruzando = j.peatonesCruzando.map(t => t - 1);
+  const salieron = j.peatonesCruzando.filter(t => t <= 0).length;
+  j.peatonesCruzando = j.peatonesCruzando.filter(t => t > 0);
+  j.puntos += 15 * salieron;
+  if (j.estado === "peatones") {
+    for (let i = 0; i < j.peatonesEsperando; i++) j.peatonesCruzando.push(2);
+    j.peatonesEsperando = 0;
+  }
+}
+
+function revisarAccidentes(j) {
+  if (j.autosEnCruce.length > 0 && j.peatonesCruzando.length > 0) {
+    j.vidas -= 1;
+    j.autosEnCruce.pop();
+    j.peatonesCruzando.pop();
+    j.mensajes.push("¡ACCIDENTE! Un auto atropelló a un peatón.");
+  }
+}
+
+function revisarPaciencia(j) {
+  if (j.peatonesEsperando > 0 && j.estado !== "peatones") j.esperaPeatones += 1;
+  else j.esperaPeatones = 0;
+  if (j.esperaPeatones > 12) {
+    j.peatonesEsperando -= 1;
+    j.peatonesCruzando.push(2);
+    j.esperaPeatones = 0;
+    j.mensajes.push("Un peatón perdió la paciencia y cruzó en rojo.");
+  }
+
+  if (j.colaAutos > 0 && j.estado !== "autos") j.esperaAutos += 1;
+  else j.esperaAutos = 0;
+  if (j.esperaAutos > 18) {
+    j.vidas -= 1;
+    j.colaAutos -= 1;
+    j.esperaAutos = 0;
+    j.mensajes.push("¡ATASCO! Un conductor esperó demasiado.");
+  }
+}
+
+function turno() {
+  if (juego.vidas <= 0) return;
+  juego.mensajes = [];
+  juego.turno += 1;
+  actualizarSemaforo(juego);
+  aparecenNuevos(juego);
+  moverAutos(juego);
+  moverPeatones(juego);
+  revisarAccidentes(juego);
+  revisarPaciencia(juego);
+  mostrar();
+  if (juego.vidas <= 0) {
+    clearInterval(intervalo);
+    document.getElementById("log").textContent = "Fin del juego. Puntos: " + juego.puntos;
+  }
+}
+
+function pedirCambio() {
+  if (juego.vidas <= 0) return;
+  cambiarSemaforo(juego);
+  mostrar();
+}
+
+function repetir(emoji, n) {
+  return n > 0 ? emoji.repeat(Math.min(n, 30)) : "-";
+}
+
+function encender(id, activo) {
+  document.getElementById(id).classList.toggle("on", activo);
+}
+
+function mostrar() {
+  const j = juego;
+  document.getElementById("turno").textContent = j.turno;
+  document.getElementById("vidas").textContent = j.vidas;
+  document.getElementById("puntos").textContent = j.puntos;
+  document.getElementById("estado").textContent = j.estado;
+  document.getElementById("cola").textContent = repetir("🚗", j.colaAutos);
+  document.getElementById("cruceAutos").textContent = repetir("🚙", j.autosEnCruce.length);
+  document.getElementById("cruzando").textContent = repetir("🚶", j.peatonesCruzando.length);
+  document.getElementById("esperando").textContent = repetir("🧍", j.peatonesEsperando);
+
+  const parpadeoPeaton = j.estado === "parpadeo" && j.temporizador % 2 === 1;
+  const verdePeatones = j.estado === "peatones" || parpadeoPeaton;
+  encender("a-verde", j.estado === "autos");
+  encender("a-amarillo", j.estado === "amarillo");
+  encender("a-rojo", j.estado === "peatones" || j.estado === "parpadeo");
+  encender("p-verde", verdePeatones);
+  encender("p-rojo", !verdePeatones);
+
+  if (j.mensajes.length > 0) document.getElementById("log").textContent = j.mensajes.join(" ");
+}
+
+function iniciar() {
+  clearInterval(intervalo);
+  juego = nuevoJuego();
+  document.getElementById("log").textContent = "";
+  mostrar();
+  intervalo = setInterval(turno, 1000);
+}
+
+document.getElementById("btnCambiar").onclick = pedirCambio;
+document.getElementById("btnReiniciar").onclick = iniciar;
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    pedirCambio();
+  }
+});
+
+iniciar();
+</script>
+</body>
+</html>
