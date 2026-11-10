@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Semáforo</title>
+<title>El Semáforo Inteligente</title>
 <style>
   body { margin:0; padding:16px; background:#16252a; color:#f2f2f2; font-family:system-ui,sans-serif; text-align:center; }
   h1 { margin:6px 0 10px; }
@@ -22,9 +22,22 @@
   button { font-size:18px; padding:10px 22px; margin:10px 4px 0; border:0; border-radius:6px; background:#f2b632; color:#222; cursor:pointer; font-weight:600; }
   button:hover { background:#ffd25e; }
   #log { min-height:44px; margin-top:10px; color:#ff8a7a; font-weight:600; }
+  #inicio { position:fixed; inset:0; background:rgba(10,18,20,.96); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; z-index:10; }
+  #inicio h2 { font-size:34px; margin:0 0 10px; }
+  #inicio p { max-width:520px; margin:6px 0; font-size:17px; line-height:1.4; opacity:.9; }
+  #inicio .emojis { font-size:40px; margin-bottom:10px; }
+  #inicio.oculto { display:none; }
 </style>
 </head>
 <body>
+<div id="inicio">
+  <div class="emojis">🚦🚗🚶</div>
+  <h2>El Semáforo Inteligente</h2>
+  <p>Controla el semáforo para que los autos y los peatones pasen sin accidentes.</p>
+  <p>Cambia el semáforo con la barra espaciadora o con el botón. Si un peatón cruza mientras hay autos en el cruce, pierdes una vida. Si alguien espera demasiado, también.</p>
+  <p>Tienes 3 vidas. Cada turno dura 1 segundo.</p>
+  <button id="btnEmpezar">Empezar</button>
+</div>
 <h1>El Semáforo Inteligente</h1>
 <div class="hud">
   <span>Turno: <b id="turno">0</b></span>
@@ -53,6 +66,7 @@
 <script>
 let juego;
 let intervalo;
+let jugando = false;
 
 function nuevoJuego() {
   return {
@@ -166,7 +180,7 @@ function turno() {
 }
 
 function pedirCambio() {
-  if (juego.vidas <= 0) return;
+  if (!jugando || juego.vidas <= 0) return;
   cambiarSemaforo(juego);
   mostrar();
 }
@@ -203,6 +217,8 @@ function mostrar() {
 
 function iniciar() {
   clearInterval(intervalo);
+  jugando = true;
+  document.getElementById("inicio").classList.add("oculto");
   juego = nuevoJuego();
   document.getElementById("log").textContent = "";
   mostrar();
@@ -211,6 +227,7 @@ function iniciar() {
 
 document.getElementById("btnCambiar").onclick = pedirCambio;
 document.getElementById("btnReiniciar").onclick = iniciar;
+document.getElementById("btnEmpezar").onclick = iniciar;
 document.addEventListener("keydown", e => {
   if (e.code === "Space") {
     e.preventDefault();
@@ -218,7 +235,8 @@ document.addEventListener("keydown", e => {
   }
 });
 
-iniciar();
+juego = nuevoJuego();
+mostrar();
 </script>
 </body>
 </html>
